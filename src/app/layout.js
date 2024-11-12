@@ -1,5 +1,9 @@
 import localFont from "next/font/local";
 import "./globals.css";
+import { Menu } from "lucide-react";
+import Link from "next/link";
+import Button23 from "@/components/button23";
+import Navbar from "@/components/navbar";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -23,6 +27,8 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+              <Navbar />
+
         {children}
       </body>
     </html>
