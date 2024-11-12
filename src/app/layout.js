@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import Link from "next/link";
 import Button23 from "@/components/button23";
 import Navbar from "@/components/navbar";
+import { ThemeProvider } from "@/components/theme-provider"
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -27,9 +28,16 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+                  <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
               <Navbar />
 
         {children}
+        </ThemeProvider>
       </body>
     </html>
   );
