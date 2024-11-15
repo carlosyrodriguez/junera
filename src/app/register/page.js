@@ -2,9 +2,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-
-import LoginForm from "./form";
-import Button44 from "./login-buttons";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 
 export default function Login() {
@@ -22,8 +19,6 @@ export default function Login() {
       <main className="flex flex-col gap-8 items-center w-full max-w-md sm:max-w-lg">
         <Card className="w-full p-4 sm:p-8">
           <h1 className="text-4xl font-bold text-center mb-4">Login</h1>
-          <Button44 />
-          <LoginForm />
         </Card>
       </main>
     </div>

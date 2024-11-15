@@ -5,10 +5,17 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+
 import Link from "next/link";
-
-import { CalendarDays } from "lucide-react"
-
+import Button24 from "@/components/button24"
 import {
   Avatar,
   AvatarFallback,
@@ -20,12 +27,25 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Flag } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { JobCard } from "../../../components/job-posting";
 
 export function CompanyHoverCard({ companyName, companyLogo, companyDescription, companyId }) {
   return (
     <HoverCard>
-      <HoverCardTrigger asChild className="m-0 px-0">
-        <Button variant="link">{companyName}</Button>
+      <HoverCardTrigger asChild className="p-0">
+        <Button variant="link" className="p-0 text-lg font-semibold">
+          <img src={companyLogo || "https://via.placeholder.com/150"} alt={companyName} className="w-8 h-8 rounded-full" />
+          
+          {companyName}</Button>
       </HoverCardTrigger>
       <HoverCardContent className="w-80 mx-4">
         <Link href={`/companies/${companyId}`}>
@@ -47,14 +67,127 @@ export function CompanyHoverCard({ companyName, companyLogo, companyDescription,
   )
 }
 
+export function ReportPopover() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline"><Flag /></Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 mx-4">
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <h4 className="font-medium leading-none">Report Job Posting</h4>
+            <p className="text-sm text-muted-foreground">
+              Report an issue with this job posting
+            </p>
+          </div>
+          <form className="grid gap-4">
+            <div className="grid gap-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="missingInformation"
+                  name="issueType"
+                  value="missingInformation"
+                  className="h-4 w-4"
+                />
+                <label htmlFor="missingInformation" className="text-sm">
+                  Missing Information
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="inactiveJob"
+                  name="issueType"
+                  value="inactiveJob"
+                  className="h-4 w-4"
+                />
+                <label htmlFor="inactiveJob" className="text-sm">
+                  Inactive Job Posting
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="incorrectDetails"
+                  name="issueType"
+                  value="incorrectDetails"
+                  className="h-4 w-4"
+                />
+                <label htmlFor="incorrectDetails" className="text-sm">
+                  Incorrect Job Details
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="other"
+                  name="issueType"
+                  value="other"
+                  className="h-4 w-4"
+                />
+                <label htmlFor="other" className="text-sm">
+                  Other
+                </label>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="comments" className="text-sm font-medium">
+                Additional Comments (optional)
+              </label>
+              <textarea
+                id="comments"
+                rows="3"
+                className="w-full mt-1 p-2 border border-gray-300 rounded-md"
+                placeholder="Provide more details here..."
+              ></textarea>
+            </div>
+            <Button type="submit">Submit Report</Button>
+          </form>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 async function getJobPostingById(id) {
   const pool = await getConnection();
   const result = await pool
     .request()
     .input("id", id) // Use parameterized query to prevent SQL injection
-    .query("SELECT jobPostings.*, companies.name AS companyName, companies.description AS companyDescription, companies.logo AS companyLogo FROM jobPostings JOIN companies ON jobPostings.company_id = companies.id WHERE jobPostings.id = @id");
+    .query("SELECT jobPostings.*, companies.name AS companyName, companies.description AS companyDescription, companies.logo AS logo FROM jobPostings JOIN companies ON jobPostings.company_id = companies.id WHERE jobPostings.id = @id");
 
   return result.recordset[0]; // Return the first (and only) result
+}
+
+async function getRelatedJobPostings(jobPosting) {
+  const pool = await getConnection();
+
+  // Fetch similar job postings based on location, title, and experience level
+  const similarPostings = await pool.request()
+    .input('id', jobPosting.id)
+    .query(`
+      SELECT TOP 10 jobPostings.*, companies.name AS company, companies.description AS companyDescription, companies.logo AS companyLogo
+      FROM jobPostings
+      JOIN companies ON jobPostings.company_id = companies.id
+      WHERE jobPostings.id != @id
+    `);
+
+  // Fetch job postings from the same company
+  const sameCompanyPostings = await pool.request()
+    .input('companyId', jobPosting.company_id)
+    .input('id', jobPosting.id)
+    .query(`
+      SELECT TOP 10 * FROM jobPostings
+      WHERE company_id = @companyId
+        AND id != @id
+    `);
+
+  return {
+    similarPostings: similarPostings.recordset,
+    sameCompanyPostings: sameCompanyPostings.recordset
+  };
 }
 
 export default async function JobPostingPage({ params }) {
@@ -65,56 +198,91 @@ export default async function JobPostingPage({ params }) {
     return <div>Job posting not found.</div>;
   }
 
+  const relatedPostings = await getRelatedJobPostings(jobPosting);
+
   return (
-    <div className="container mx-auto py-10 p-4">
+    <div className="container mx-auto py-10 px-4 max-w-4xl">
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/">Jobs</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink href={`/companies/${jobPosting.company_id}`}>{jobPosting.companyName}</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{jobPosting.title}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
       <CompanyHoverCard 
+        className="text-lg font-semibold"
         companyName={jobPosting.companyName} 
         companyLogo={jobPosting.companyLogo} 
         companyDescription={jobPosting.companyDescription}
         companyId={jobPosting.company_id}
       />
       <h1 className="text-2xl font-bold mb-2">{jobPosting.title}</h1>
-      <p className="text-sm font-semibold">{jobPosting.location}</p>
-      <p className="text-xs text-muted-foreground">{new Date(jobPosting.postedDate).toLocaleDateString()}</p>
+      <p className="text-md">{jobPosting.location} | {new Date(jobPosting.postedDate).toLocaleDateString()} | {jobPosting.experienceLevel}</p>
       <p>{jobPosting.salary ? `${jobPosting.salary}` : ""}</p>
-      <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
-        <AccordionItem value="item-1">
-          <AccordionTrigger>Job Description</AccordionTrigger>
-          <AccordionContent>
-            {jobPosting.description}
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="item-2">
-          <AccordionTrigger>Requirements</AccordionTrigger>
-          <AccordionContent>
-            {jobPosting.requirements}
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="item-3">
-          <AccordionTrigger>Responsibilities</AccordionTrigger>
-          <AccordionContent>
-            {jobPosting.responsibilities}
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="item-4">
-          <AccordionTrigger>Company Description</AccordionTrigger>
-          <AccordionContent>
-            {jobPosting.companyDescription}
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="item-5">
-          <AccordionTrigger>Benefits</AccordionTrigger>
-          <AccordionContent>
-            {jobPosting.Benefits}
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="item-6">
-          <AccordionTrigger>Minimum Requirements</AccordionTrigger>
-          <AccordionContent>
-            {jobPosting.MinimumQualifications}
-          </AccordionContent>
-        </AccordionItem>
+      <div className="flex space-x-4 mt-4 mb-8">
+        <Link href={`${jobPosting.link}`}>
+          <Button className="bg-lime-500 text-white hover:bg-green-800 dark:bg-lime-600">Apply</Button>
+        </Link>
+        <ReportPopover />
+        <Button24 />
+      </div>
+      <div className="flex flex-col space-y-2 mb-4">
+  <Link href={`/job-postings?explevel=${encodeURIComponent(jobPosting.experienceLevel)}`}>
+    <p className="text-lime-500 underline">See more {jobPosting.experienceLevel} jobs</p>
+  </Link>
+  <Link href={`/job-postings?location=${encodeURIComponent(jobPosting.location)}`}>
+    <p className="text-lime-500 underline">See jobs in {jobPosting.location}</p>
+  </Link>
+  <Link href={`/job-postings?title=${encodeURIComponent(jobPosting.title)}`}>
+    <p className="text-lime-500 underline">See more '{jobPosting.title}' jobs</p>
+  </Link>
+</div>
+      <Accordion type="single" collapsible className="w-full" defaultValue="item-description">
+        {[
+          { key: 'companyDescription', label: 'Company Description' },
+          { key: 'description', label: 'Job Description' },
+          { key: 'responsibilities', label: 'Responsibilities' },
+          { key: 'requirements', label: 'Requirements' },
+          { key: 'Benefits', label: 'Benefits' },
+          { key: 'MinimumQualifications', label: 'Minimum Requirements' },
+          { key: 'relocation', label: 'Relocation Assistance' },
+          { key: 'EqualOpportunityEmployerInfo', label: 'Equal Opportunity Employer Info' },
+          { key: 'IsRemote', label: 'Remote Work Availability' },
+          { key: 'H1BVisaSponsorship', label: 'H1B Visa Sponsorship' },
+          { key: 'HoursPerWeek', label: 'Hours Per Week' },
+          { key: 'Schedule', label: 'Schedule' },
+          { key: 'NiceToHave', label: 'Nice to Have' }
+        ].map(({ key, label }) => (
+          typeof jobPosting[key] === 'string' && jobPosting[key].length > 4 && (
+            <AccordionItem className="text-md" key={key} value={`item-${key}`}>
+              <AccordionTrigger className="text-md">{label}</AccordionTrigger>
+              <AccordionContent>{jobPosting[key]}</AccordionContent>
+            </AccordionItem>
+          )
+        ))}
       </Accordion>
+
+      <h2 className="text-xl font-bold mt-10 mb-4">Similar Job Postings</h2>
+      <div className="grid gap-4">
+        {relatedPostings.similarPostings.map((posting) => (
+          <JobCard key={posting.id} job={posting} />
+        ))}
+      </div>
+
+      <h2 className="text-xl font-bold mt-10 mb-4">Other Jobs at {jobPosting.companyName}</h2>
+      <div className="grid gap-4">
+        {relatedPostings.sameCompanyPostings.map((posting) => (
+          <JobCard key={posting.id} job={posting} />
+        ))}
+      </div>
     </div>
   );
 }

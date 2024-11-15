@@ -1,6 +1,8 @@
 "use client";
 // Inspired by react-hot-toast library
 import * as React from "react"
+import { useContext } from "react";
+import { ToastContext } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -132,24 +134,12 @@ function toast({
   }
 }
 
-function useToast() {
-  const [state, setState] = React.useState(memoryState)
-
-  React.useEffect(() => {
-    listeners.push(setState)
-    return () => {
-      const index = listeners.indexOf(setState)
-      if (index > -1) {
-        listeners.splice(index, 1)
-      }
-    };
-  }, [state])
-
-  return {
-    ...state,
-    toast,
-    dismiss: (toastId) => dispatch({ type: "DISMISS_TOAST", toastId }),
-  };
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error("useToast must be used within a ToastProvider");
+  }
+  return context;
 }
 
-export { useToast, toast }
+export { toast }

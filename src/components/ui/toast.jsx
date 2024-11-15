@@ -3,10 +3,37 @@ import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"
 import { cva } from "class-variance-authority";
 import { X } from "lucide-react"
+import { createContext, useState } from "react";
 
 import { cn } from "@/lib/utils"
 
-const ToastProvider = ToastPrimitives.Provider
+const ToastContext = createContext();
+
+const ToastProvider = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+
+  const toast = (toastContent) => {
+    setToasts([...toasts, { ...toastContent, id: Date.now() }]);
+  };
+
+  return (
+    <ToastPrimitives.Provider>
+      <ToastContext.Provider value={{ toast }}>
+        {children}
+        <ToastViewport>
+          {toasts.map((t) => (
+            <Toast key={t.id}>
+              <ToastTitle>{t.title}</ToastTitle>
+              <ToastDescription>{t.description}</ToastDescription>
+              {t.action}
+              <ToastClose />
+            </Toast>
+          ))}
+        </ToastViewport>
+      </ToastContext.Provider>
+    </ToastPrimitives.Provider>
+  );
+};
 
 const ToastViewport = React.forwardRef(({ className, ...props }, ref) => (
   <ToastPrimitives.Viewport
@@ -83,4 +110,4 @@ const ToastDescription = React.forwardRef(({ className, ...props }, ref) => (
 ))
 ToastDescription.displayName = ToastPrimitives.Description.displayName
 
-export { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction };
+export { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction, ToastContext };

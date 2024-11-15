@@ -18,7 +18,6 @@ const dbConfig = {
       requestTimeout: 30000,
     },
   };
-  
 
 let pool;
 
